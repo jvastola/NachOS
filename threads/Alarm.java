@@ -1,4 +1,5 @@
 package nachos.threads;
+import java.util.PriorityQueue;
 
 import nachos.machine.*;
 
@@ -7,6 +8,11 @@ import nachos.machine.*;
  * until a certain time.
  */
 public class Alarm {
+    /**
+     * 
+     */
+    PriorityQueue<SleepBundle> sleepQueue;
+
     /**
      * Allocate a new Alarm. Set the machine's timer interrupt handler to this
      * alarm's callback.
@@ -17,7 +23,9 @@ public class Alarm {
     public Alarm() {
 	Machine.timer().setInterruptHandler(new Runnable() {
 		public void run() { timerInterrupt(); }
-	    });
+        });
+        
+        sleepQueue = new PriorityQueue<>();
     }
 
     /**
@@ -27,7 +35,15 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-	KThread.currentThread().yield();
+        KThread.currentThread().yield();
+      //  System.out.println(Machine.timer().getTime());
+        long currTime = Machine.timer().getTime();
+
+        while(!sleepQueue.isEmpty() && sleepQueue.peek().wakeUpTime <= currTime) {
+            sleepQueue.poll().thread.ready();
+            
+        }
+
     }
 
     /**
@@ -45,9 +61,45 @@ public class Alarm {
      * @see	nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+        //Check if x is invalid (0 or negative)
+        if(x <= 0) {
+            return;
+        }
+
+        //Add thread to queue based on its wake up time (x + Timer.getTime());
+        long wakeUpTime = Machine.timer().getTime() + x;
+
+        SleepBundle toAdd = new SleepBundle(KThread.currentThread(), wakeUpTime);
+        //Put thread to sleep on the lock inside sleep bundle
+        toAdd.sleepLock.acquire();
+        sleepQueue.add(toAdd);
+        toAdd.sleepCond.sleep();
+
+        //Put the thread to sleep/block?
+        
+
+        //Change this so its instead a queue of locks -> wakeUpTime + sleepCond, 
+        //have the thread acquire the lock and then sleep on it, 
+        //create the threadbundle obj and put it into the priority queue
+        //I think i also need to put the Lock
+        
+
+    }
+
+
+    //Testing methods
+    public static void alarmTest1() {
+        int durations[] = {0, 20, 50, 1000000};
+        long t0, t1;
+        for (int d : durations) {    
+            t0 = Machine.timer().getTime();    
+            ThreadedKernel.alarm.waitUntil (d);    
+            t1 = Machine.timer().getTime();    
+            System.out.println ("alarmTest1: waited for " + (t1 - t0) + " ticks");
+        }
+    }
+
+    public static void selfTest() {
+        alarmTest1();
     }
 }
