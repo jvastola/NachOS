@@ -148,7 +148,7 @@ public class KThread {
             public void run() {
                 runThread();
             }
-            });
+        });
 
         ready();
         
@@ -156,8 +156,14 @@ public class KThread {
     }
 
     private void runThread() {
+        System.out.println("--- runThread() called on " + toString());
         begin();
         target.run();
+        // If the thread was joined, set parent to ready,
+        // the thread is no longer joined
+        if(this.joinParent != null){
+            this.joinParent.status = statusReady;
+        }
         finish();
     }
 
@@ -193,6 +199,7 @@ public class KThread {
 
 
         currentThread.status = statusFinished;
+        
         
         sleep();
     }
@@ -243,8 +250,10 @@ public class KThread {
         
         Lib.assertTrue(Machine.interrupt().disabled()); // Disables interrupts?
 
-        if (currentThread.status != statusFinished)
+        if (currentThread.status != statusFinished){
             currentThread.status = statusBlocked;
+            // waitQueue.acquire(this); // Slaps sleeping threads in waitQueue
+        }
 
         runNextThread();
     }
@@ -277,18 +286,17 @@ public class KThread {
 
         // currentThread = B
         // this = A
-	    Lib.assertTrue(this != currentThread);
-        if(this.status != statusFinished){ // If A isn't finished
-            currentThread.sleep(); // Put B to sleep
-            this.ready(); // Announce A is ready
-        }
-        // currentThread().runThread(); // Run and finish B
-        /*
-        */
 
-        // Need to find a way to finish 
-        // Also need to make sure multiple threads aren't calling 
-        // join() on the same thread
+        // Checks if joining on itself
+        Lib.assertTrue(this != currentThread); 
+
+        // If A isn't finished and the thread hasn't already been joined
+        if(this.status != statusFinished && this.joinParent == null){
+            this.joinParent = currentThread; // Stores reference to B
+            currentThread.sleep(); // Put B to sleep
+        }
+
+        // Need to find a way to finish B after A completes
     }
 
     /**
@@ -348,18 +356,20 @@ public class KThread {
     private void run() {
         Lib.assertTrue(Machine.interrupt().disabled());
 
-        Machine.yield();
+        if(this.status != statusBlocked || this.status != statusFinished){
+            Machine.yield();
 
-        currentThread.saveState();
+            currentThread.saveState();
 
-        Lib.debug(dbgThread, "Switching from: " + currentThread.toString()
-              + " to: " + toString());
+            Lib.debug(dbgThread, "Switching from: " + 
+            currentThread.toString() + " to: " + toString());
 
-        currentThread = this;
+            currentThread = this;
 
-        tcb.contextSwitch();
+            tcb.contextSwitch();
 
-        currentThread.restoreState();
+            currentThread.restoreState();
+        }
     }
 
     /**
@@ -466,6 +476,7 @@ public class KThread {
     private Runnable target;
     private TCB tcb;
 
+    private KThread joinParent = null;
     /**
      * Unique identifer for this thread. Used to deterministically compare
      * threads.
@@ -475,6 +486,7 @@ public class KThread {
     private static int numCreated = 0;
 
     private static ThreadQueue readyQueue = null;
+    // private static ThreadQueue waitQueue = null;
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
