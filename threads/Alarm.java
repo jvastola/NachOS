@@ -36,12 +36,14 @@ public class Alarm {
      */
     public void timerInterrupt() {
         KThread.currentThread().yield();
-      //  System.out.println(Machine.timer().getTime());
+        
         long currTime = Machine.timer().getTime();
 
+        //Check the top most element of the queue (if its not empty) and see if its past its wakeup time
+        //While loop is used here to make sure that all threads that need to be awoken at this time is awoken at the same time
         while(!sleepQueue.isEmpty() && sleepQueue.peek().wakeUpTime <= currTime) {
+            //Remove the thread from the sleep queue and put it on the ready queue
             sleepQueue.poll().thread.ready();
-            
         }
 
     }
@@ -69,27 +71,23 @@ public class Alarm {
         //Add thread to queue based on its wake up time (x + Timer.getTime());
         long wakeUpTime = Machine.timer().getTime() + x;
 
+        //Create a new sleepbundle with out current thread and the time to wake it up at
         SleepBundle toAdd = new SleepBundle(KThread.currentThread(), wakeUpTime);
+
         //Put thread to sleep on the lock inside sleep bundle
         toAdd.sleepLock.acquire();
+
+        //Add the bundle to our sleep queue
         sleepQueue.add(toAdd);
+
+        //Put thread to sleep on its sleepCond
         toAdd.sleepCond.sleep();
-
-        //Put the thread to sleep/block?
-        
-
-        //Change this so its instead a queue of locks -> wakeUpTime + sleepCond, 
-        //have the thread acquire the lock and then sleep on it, 
-        //create the threadbundle obj and put it into the priority queue
-        //I think i also need to put the Lock
-        
-
     }
 
 
     //Testing methods
     public static void alarmTest1() {
-        int durations[] = {0, 20, 50, 1000000};
+        int durations[] = {0, 20, 500, 1000000};
         long t0, t1;
         for (int d : durations) {    
             t0 = Machine.timer().getTime();    
