@@ -156,13 +156,14 @@ public class KThread {
     }
 
     private void runThread() {
-        System.out.println("--- runThread() called on " + toString());
+        Lib.debug(dbgThread, "--- runThread() called on " + toString());
         begin();
         target.run();
         // If the thread was joined, set parent to ready,
         // the thread is no longer joined
         if(this.joinParent != null){
-            this.joinParent.status = statusReady;
+            Machine.interrupt().disable();
+            this.joinParent.ready();
         }
         finish();
     }
@@ -190,18 +191,17 @@ public class KThread {
     public static void finish() {
         Lib.debug(dbgThread, " -- Finishing thread: " + currentThread.toString());
         
-        Machine.interrupt().disable(); // Disables interrupts?
+        Machine.interrupt().disable(); // Disables interrupts
 
         Machine.autoGrader().finishingCurrentThread();
 
         Lib.assertTrue(toBeDestroyed == null);
         toBeDestroyed = currentThread;
 
-
         currentThread.status = statusFinished;
         
-        
         sleep();
+        Machine.interrupt().enable(); // Reenables interrupts
     }
 
     /**
@@ -225,13 +225,13 @@ public class KThread {
         
         Lib.assertTrue(currentThread.status == statusRunning);
         
-        boolean intStatus = Machine.interrupt().disable(); // Disables interrupts? 
+        boolean intStatus = Machine.interrupt().disable(); // Disables interrupts
 
         currentThread.ready();
 
         runNextThread();
         
-        Machine.interrupt().restore(intStatus);
+        Machine.interrupt().restore(intStatus); // Enables interrupts, all be it in a weird way
     }
 
     /**
@@ -247,13 +247,11 @@ public class KThread {
      */
     public static void sleep() {
         Lib.debug(dbgThread, "Sleeping thread: " + currentThread.toString());
-        
-        Lib.assertTrue(Machine.interrupt().disabled()); // Disables interrupts?
+        Machine.interrupt().disable();
+        Lib.assertTrue(Machine.interrupt().disabled()); // Checks if interrupts *disabled*?
 
-        if (currentThread.status != statusFinished){
+        if (currentThread.status != statusFinished)
             currentThread.status = statusBlocked;
-            // waitQueue.acquire(this); // Slaps sleeping threads in waitQueue
-        }
 
         runNextThread();
     }
@@ -284,6 +282,7 @@ public class KThread {
     public void join() {
 	    Lib.debug(dbgThread, "Joining thread: " + currentThread.toString() + " to thread: " + toString());
 
+        Machine.interrupt().disable(); // Disable interrupts
         // currentThread = B
         // this = A
 
@@ -295,8 +294,7 @@ public class KThread {
             this.joinParent = currentThread; // Stores reference to B
             currentThread.sleep(); // Put B to sleep
         }
-
-        // Need to find a way to finish B after A completes
+        Machine.interrupt().enable(); // Reenable interrupts
     }
 
     /**
@@ -442,6 +440,7 @@ public class KThread {
         Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
     }
 
+    /*
     public static void selfTest() {
         Lib.debug(dbgThread, "Enter KThread.selfTest");
         
@@ -449,6 +448,46 @@ public class KThread {
         new PingTest(0).run();
 
         joinTest1();
+    }
+    */
+    public static void selfTest() {
+        Lib.debug(dbgThread, "Enter KThread.selfTest");    
+        /**
+         * Allocate a new thread setting the target to point to a
+         * PingTest object whose run method will be called when the
+         * newly created thread executes.
+         */
+        KThread th1 = new KThread(new PingTest(1));
+        /**
+         * Set the name of the new thread to "forked thread 1"
+         */
+        th1.setName("forked thread 1");
+        /**
+         * Execute fork() to begin execution of the new thread
+         * (putting it in the ready queue). This new thread will
+         * eventually execute the PingTest object's run() method when
+         * scheduled. The current thread (that created this new thread)
+         * will return from the fork() method call resuming its own
+         * execution, thus, giving us 2 concurrent thread.     
+         */
+        th1.fork();
+        /**
+         * The current thread that returned from fork() (creating the
+         * new thread th1 above) will then create its own PingTest
+         * object and execute the run method. So now we have two
+         * threads running the PingTest's run() method.     
+         */
+        new PingTest(0).run();
+        /**
+         * Current thread calls join() on the newly created thread
+         * thus going to sleep till th1 finishes.
+         */
+        th1.join();
+        /**
+         * Try to join with th1 again. This should immediately return
+         * as th1 should have already finished.
+         */
+        th1.join();
     }
 
     private static final char dbgThread = 't';
