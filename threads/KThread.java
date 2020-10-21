@@ -163,7 +163,9 @@ public class KThread {
         // the thread is no longer joined
         if(this.joinParent != null){
             Machine.interrupt().disable();
-            this.joinParent.ready();
+            this.joinParent.unfinishedChilds--;
+            if(this.joinParent.unfinishedChilds == 0)
+                this.joinParent.ready();
         }
         finish();
     }
@@ -280,7 +282,7 @@ public class KThread {
      * thread.
      */
     public void join() {
-	    Lib.debug(dbgThread, "Joining thread: " + currentThread.toString() + " to thread: " + toString());
+	    Lib.debug(dbgThread, "~~~ Joining thread: " + currentThread.toString() + " to thread: " + toString());
 
         Machine.interrupt().disable(); // Disable interrupts
         // currentThread = B
@@ -292,6 +294,7 @@ public class KThread {
         // If A isn't finished and the thread hasn't already been joined
         if(this.status != statusFinished && this.joinParent == null){
             this.joinParent = currentThread; // Stores reference to B
+            currentThread.unfinishedChilds++; // Add to child count
             currentThread.sleep(); // Put B to sleep
         }
         Machine.interrupt().enable(); // Reenable interrupts
@@ -420,74 +423,44 @@ public class KThread {
     /**
      * Tests whether this module is working.
      */
-    private static void joinTest1 () {
+    private static void joinTest () {
         KThread child1 = new KThread( new Runnable () {
             public void run() {
-                System.out.println("I (heart) Nachos!");
+                System.out.println("I (heart) child1!");
             }    
         });
-        child1.setName("child1").fork();
+        KThread child2 = new KThread( new Runnable () {
+            public void run() {
+                System.out.println("I (heart) child2!");
+            }    
+        });
+        child1.setName("child1");
+        child2.setName("child2");
+        child1.join();
+        child2.join();
+        child1.fork();
+        child2.fork();
         // We want the child to finish before we call join.  Although
         // our solutions to the problems cannot busy wait, our test
         // programs can!
+        /*
         for (int i = 0; i < 5; i++) {
             System.out.println ("busy...");
             KThread.currentThread().yield();
         }
-        child1.join();
+        */
         System.out.println("After joining, child1 should be finished.");
         System.out.println("is it? " + (child1.status == statusFinished));
         Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
     }
 
-    /*
     public static void selfTest() {
         Lib.debug(dbgThread, "Enter KThread.selfTest");
         
         new KThread(new PingTest(1)).setName("forked thread").fork();
         new PingTest(0).run();
 
-        joinTest1();
-    }
-    */
-    public static void selfTest() {
-        Lib.debug(dbgThread, "Enter KThread.selfTest");    
-        /**
-         * Allocate a new thread setting the target to point to a
-         * PingTest object whose run method will be called when the
-         * newly created thread executes.
-         */
-        KThread th1 = new KThread(new PingTest(1));
-        /**
-         * Set the name of the new thread to "forked thread 1"
-         */
-        th1.setName("forked thread 1");
-        /**
-         * Execute fork() to begin execution of the new thread
-         * (putting it in the ready queue). This new thread will
-         * eventually execute the PingTest object's run() method when
-         * scheduled. The current thread (that created this new thread)
-         * will return from the fork() method call resuming its own
-         * execution, thus, giving us 2 concurrent thread.     
-         */
-        th1.fork();
-        /**
-         * The current thread that returned from fork() (creating the
-         * new thread th1 above) will then create its own PingTest
-         * object and execute the run method. So now we have two
-         * threads running the PingTest's run() method.     
-         */
-        new PingTest(0).run();
-        /**
-         * Current thread calls join() on the newly created thread
-         * thus going to sleep till th1 finishes.
-         */
-        th1.join();
-        /**
-         * Try to join with th1 again. This should immediately return
-         * as th1 should have already finished.
-         */
-        th1.join();
+        joinTest();
     }
 
     private static final char dbgThread = 't';
@@ -515,7 +488,11 @@ public class KThread {
     private Runnable target;
     private TCB tcb;
 
+    // If child thread, then this value will hold
+    // reference to parent thread
     private KThread joinParent = null;
+    // Counts how many children a thread has
+    private int unfinishedChilds = 0;
     /**
      * Unique identifer for this thread. Used to deterministically compare
      * threads.
