@@ -354,11 +354,11 @@ public class PriorityScheduler extends Scheduler {
 	class EffectivePriorityComparator implements Comparator<ThreadState> {
 		@Override
 
-		public int compare(ThreadState t0, ThreadState t1) {
-			if (t0.getEffectivePriority() == t1.getEffectivePriority())
-				return t0.waittime - t1.waittime;
+		public int compare(ThreadState t1, ThreadState t2) {
+			if (t1.getEffectivePriority() == t2.getEffectivePriority())
+				return t1.waittime - t2.waittime;
 			else
-				return t0.getEffectivePriority() - t1.getEffectivePriority();
+				return t1.getEffectivePriority() - t2.getEffectivePriority();
 		}
 
 	}
