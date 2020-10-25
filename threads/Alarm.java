@@ -25,7 +25,7 @@ public class Alarm {
 		public void run() { timerInterrupt(); }
         });
         
-        sleepQueue = new PriorityQueue<>();
+        sleepQueue = new PriorityQueue<SleepBundle>();
     }
 
     /**
@@ -45,7 +45,6 @@ public class Alarm {
             //Remove the thread from the sleep queue and put it on the ready queue
             sleepQueue.poll().thread.ready();
         }
-
     }
 
     /**
@@ -72,22 +71,19 @@ public class Alarm {
         long wakeUpTime = Machine.timer().getTime() + x;
 
         //Create a new sleepbundle with out current thread and the time to wake it up at
-        SleepBundle toAdd = new SleepBundle(KThread.currentThread(), wakeUpTime);
+        sleepQueue.add(new SleepBundle(KThread.currentThread(), wakeUpTime));
 
-        //Put thread to sleep on the lock inside sleep bundle
-        toAdd.sleepLock.acquire();
-
-        //Add the bundle to our sleep queue
-        sleepQueue.add(toAdd);
-
-        //Put thread to sleep on its sleepCond
-        toAdd.sleepCond.sleep();
+        //Put thread to sleep
+        boolean oldInt = Machine.interrupt().disable();
+        KThread.currentThread().sleep();
+        Machine.interrupt().restore(oldInt);
+        
     }
 
 
     //Testing methods
     public static void alarmTest1() {
-        int durations[] = {0, 20, 500, 1000000};
+        int durations[] = {-100, 0, 100, 500, 214700};
         long t0, t1;
         for (int d : durations) {    
             t0 = Machine.timer().getTime();    
