@@ -138,13 +138,13 @@ public class PriorityScheduler extends Scheduler {
 		{
 			if (owner != null)
 			{
-				owner.updatePriority(owner);
+				owner.updatePriority();
 				for (PriorityQueue p : owner.owned)	// iterate through every resource queue
 				{
 					if (!p.waiting.isEmpty())
 						for (ThreadState t : p.waiting)
 						{
-							t.updatePriority(t);		// update every thread's effective priority 
+							t.updatePriority();		// update every thread's effective priority 
 							if (t.epriority > owner.epriority)
 							{
 								owner.epriority = t.epriority;
@@ -266,9 +266,9 @@ public class PriorityScheduler extends Scheduler {
 				return;
 
 			this.priority = priority;
-
+			this.epriority = this.priority;		
 			// implement me
-			this.updatePriority(this);
+			this.updatePriority();
 
 			if (waitingFor != null) {// update priority in
 				waitingFor.waiting.remove(this);
@@ -331,7 +331,7 @@ public class PriorityScheduler extends Scheduler {
 			owned.add(waitQueue);
 			if (waitQueue.owner != null && waitQueue.owner != this) {
 				waitQueue.owner.owned.remove(waitQueue);
-				updatePriority(waitQueue.owner);
+				waitQueue.owner.updatePriority();
 			}
 			waitQueue.owner = this;
 
@@ -339,20 +339,17 @@ public class PriorityScheduler extends Scheduler {
 
 		}
 
-		protected void updatePriority(ThreadState s) {
-			int newEffectivePriority = priority;
-			for (PriorityQueue res : owned)
-				if (res.transferPriority && !res.waiting.isEmpty())
-					if (res.waiting.last().epriority > newEffectivePriority)
-						newEffectivePriority = res.waiting.last().epriority;
-			if (newEffectivePriority != epriority) {
-				if (this.waitingFor != null)
-					this.waitingFor.waiting.remove(this);
-				epriority = newEffectivePriority;
-				if (this.waitingFor != null) {
-					this.waitingFor.waiting.add(this);
-					Lib.assertTrue(this.waitingFor.owner != null);
-					updatePriority(getThreadState(this.waitingFor.owner.thread));
+		protected void updatePriority() {
+			this.epriority = this.priority;
+			if(owned!=null) {
+				for(PriorityQueue res: owned) {
+					for (ThreadState t : res.waiting){
+						if (t.getEffectivePriority()> t.epriority) {
+							this.epriority = t.getEffectivePriority();
+							if(waitingFor != null && waitingFor.owner != null)
+								waitingFor.owner.updatePriority();
+						}
+					}
 				}
 			}
 		}
