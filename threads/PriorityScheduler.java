@@ -242,10 +242,12 @@ public class PriorityScheduler extends Scheduler {
 		public void setPriority(int priority) {
 			if (this.priority == priority)
 				return;
+
 			this.priority = priority;
+
 			// implement me
 			this.updatePriority(this);
-			if (waitingQ != null) { //update priority in
+			if (waitingQ != null) {// update priority in
 				waitingQ.waiting.remove(this);
 				waitingQ.waiting.add(this);
 			}
@@ -265,15 +267,18 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void waitForAccess(PriorityQueue waitQueue) {
 			// implement me
-			if (waitingQ != null){ //illegal to be in multiple queues
+			if (waitingQ != null) // illegal to be in multile queues
+			{
 				waitingQ.waiting.remove(this);
 			}
-			for (ThreadState t : waitQueue.waiting) {//increment other threads in queue
+			this.waittime = 0;
+			for (ThreadState t : waitQueue.waiting) {// increment other threads in queue
 				t.waittime++;
 			}
 			waitQueue.waiting.add(this);
 			waitingQ = waitQueue;
-			if (owned.contains(waitingQ)){//update set of acquired resources
+			if (owned != null && owned.contains(waitingQ)) // update set of acquired resources
+			{
 				owned.remove(waitingQ);
 			}
 		}
