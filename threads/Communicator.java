@@ -88,31 +88,31 @@ public class Communicator {
     	messageReceived = true;
     	oneLock.release();
     	
-	return hold;
+	    return hold;
     }
 
     public static void testCase() {
-    	final Communicator com = new Communicator();
+    	final Communicator myComm = new Communicator();
     	
-    	KThread thread2 = new KThread(new Runnable() {
+    	KThread thread1 = new KThread(new Runnable() {
     		public void run() {
-    			System.out.println("Thread 2 begin listening");
-    			com.listen();
-    			System.out.println("Thread 2 finished listening");
+    			System.out.println("Thread 1 begin listening");
+    			myComm.listen();
+    			System.out.println("Thread 1 finished listening");
     		}
     	});
-    	KThread thread2a = new KThread(new Runnable() {
+    	KThread thread2 = new KThread(new Runnable() {
     		public void run() {
-    			System.out.println("Thread 2a begin speaking");
-    			com.speak(1);
-    			System.out.println("Thread 2a finished speaking");
+    			System.out.println("Thread 2 begin speaking");
+    			myComm.speak(1);
+    			System.out.println("Thread 2 finished speaking");
     			
     		}
     	});
-    	thread2a.fork();
     	thread2.fork();
-    	thread2a.join();
+    	thread1.fork();
     	thread2.join();
+    	thread1.join();
     }
 
     private Lock oneLock;
