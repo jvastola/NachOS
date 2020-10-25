@@ -186,7 +186,6 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		protected ThreadState pickNextThread() {
 			// implement me
-			donationUpdate();
 			if (!waiting.isEmpty())
 				return waiting.last();
 			return null;
@@ -328,13 +327,14 @@ public class PriorityScheduler extends Scheduler {
 					waitingFor = null;
 				}
 			}
+			waitQueue.waiting.remove(this);
+			owned.add(waitQueue);
 			if (waitQueue.owner != null && waitQueue.owner != this) {
 				waitQueue.owner.owned.remove(waitQueue);
-				if (waitQueue.transferPriority)
-					updatePriority(waitQueue.owner);
+				updatePriority(waitQueue.owner);
 			}
 			waitQueue.owner = this;
-			owned.add(waitQueue);
+
 			waitQueue.donationUpdate();
 
 		}
