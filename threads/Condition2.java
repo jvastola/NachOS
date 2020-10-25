@@ -38,8 +38,8 @@ public class Condition2 {
         conditionLock.release();
         Machine.interrupt().disable();
         
-        KThread.currentThread().sleep();
         waitQueue.add(KThread.currentThread());
+        KThread.sleep();
         
         Machine.interrupt().enable();
         conditionLock.acquire();
@@ -52,8 +52,11 @@ public class Condition2 {
     public void wake() {
         Lib.assertTrue(conditionLock.isHeldByCurrentThread());
         Machine.interrupt().disable();
-        if(!waitQueue.isEmpty())
-            waitQueue.removeFirst().ready();
+        if(!waitQueue.isEmpty()){
+            KThread thread = waitQueue.removeFirst();
+            if(thread != null)
+                thread.ready();
+        }
         Machine.interrupt().enable();
     }
 
@@ -65,8 +68,11 @@ public class Condition2 {
         Lib.assertTrue(conditionLock.isHeldByCurrentThread());
         Machine.interrupt().disable();
 
-        while(!waitQueue.isEmpty())
-            wake();
+        while(!waitQueue.isEmpty()){
+            KThread thread = waitQueue.removeFirst();
+            if(thread != null)
+                thread.ready();
+        }
 
         Machine.interrupt().enable();
     }
