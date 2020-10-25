@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+
+import java.util.*;
 /**
  * A <i>communicator</i> allows threads to synchronously exchange 32-bit
  * messages. Multiple threads can be waiting to <i>speak</i>,
@@ -10,11 +12,27 @@ import nachos.machine.*;
  * threads can be paired off at this point.
  */
 public class Communicator {
-    /**
+  
+    
+	/**
      * Allocate a new communicator.
      */
     public Communicator() {
+    	
+        oneLock = new Lock();
+        
+    	S_WaitingQueue = new Condition(oneLock);
+    	S_SendingWord = new Condition(oneLock);
+    	L_WaitingQueue = new Condition(oneLock);
+        L_ReceivingWord = new Condition(oneLock);
+        
+    	waitingL = false;
+    	waitingS = false;
+    	messageReceived = false;
+    	
+    	
     }
+    
 
     /**
      * Wait for a thread to listen through this communicator, and then transfer
@@ -27,6 +45,24 @@ public class Communicator {
      * @param	word	the integer to transfer.
      */
     public void speak(int word) {
+    	oneLock.acquire();
+    	while(waitingS) {
+    		S_WaitingQueue.sleep();
+    		
+    	}
+    	waitingS = true;
+    	hold = word;
+    	while( !waitingL || !messageReceived) {
+    		L_ReceivingWord.wake();
+    		S_SendingWord.sleep();
+    		
+    	}
+    	waitingL = false;
+    	waitingS = false;
+    	messageReceived = false;
+    	S_WaitingQueue.wake();
+    	L_WaitingQueue.wake();
+    	oneLock.release();
     }
 
     /**
@@ -36,6 +72,60 @@ public class Communicator {
      * @return	the integer transferred.
      */    
     public int listen() {
-	return 0;
+    	oneLock.acquire();
+    	
+    	while(waitingL) {
+    		L_WaitingQueue.sleep();
+    		
+    	}
+    	waitingL = true;
+    	
+    	while(!waitingS) {
+    		L_ReceivingWord.sleep();
+    		
+    	}
+    	S_SendingWord.wake();
+    	messageReceived = true;
+    	oneLock.release();
+    	
+	return hold;
     }
+
+    public static void testCase() {
+    	final Communicator com = new Communicator();
+    	
+    	KThread thread2 = new KThread(new Runnable() {
+    		public void run() {
+    			System.out.println("Thread 2 begin listening");
+    			com.listen();
+    			System.out.println("Thread 2 finished listening");
+    		}
+    	});
+    	KThread thread2a = new KThread(new Runnable() {
+    		public void run() {
+    			System.out.println("Thread 2a begin speaking");
+    			com.speak(1);
+    			System.out.println("Thread 2a finished speaking");
+    			
+    		}
+    	});
+    	thread2a.fork();
+    	thread2.fork();
+    	thread2a.join();
+    	thread2.join();
+    }
+
+    private Lock oneLock;
+   
+    private Condition S_WaitingQueue;
+    private Condition S_SendingWord;
+    private Condition L_WaitingQueue;
+    private Condition L_ReceivingWord;
+   
+    private boolean waitingL;
+    private boolean waitingS;
+    private boolean messageReceived;
+    
+    private int hold;  
+    
 }
