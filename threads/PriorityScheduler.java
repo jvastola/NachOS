@@ -134,6 +134,27 @@ public class PriorityScheduler extends Scheduler {
 			else
 				waiting = new TreeSet<ThreadState>(new EffectivePriorityComparator());
 		}
+		public void donationUpdate()		// update resource owner's effective priority via donations
+		{
+			if (owner != null)
+			{
+				owner.updatePriority(owner);
+				for (PriorityQueue p : owner.owned)	// iterate through every resource queue
+				{
+					if (!p.waiting.isEmpty())
+						for (ThreadState t : p.waiting)
+						{
+							t.updatePriority(t);		// update every thread's effective priority 
+							if (t.epriority > owner.epriority)
+							{
+								owner.epriority = t.epriority;
+							}
+						
+						
+						}
+				}
+			}
+		}
 
 		public void waitForAccess(KThread thread) {
 			Lib.assertTrue(Machine.interrupt().disabled());
@@ -148,6 +169,7 @@ public class PriorityScheduler extends Scheduler {
 		public KThread nextThread() {
 			Lib.assertTrue(Machine.interrupt().disabled());
 			// implement me
+			
 			//print();
 			ThreadState nextThread = this.pickNextThread();
 			if (nextThread == null)
@@ -247,9 +269,10 @@ public class PriorityScheduler extends Scheduler {
 
 			// implement me
 			this.updatePriority(this);
-			if (waitingQ != null) {// update priority in
-				waitingQ.waiting.remove(this);
-				waitingQ.waiting.add(this);
+
+			if (waitingFor != null) {// update priority in
+				waitingFor.waiting.remove(this);
+				waitingFor.waiting.add(this);
 			}
 		}
 
@@ -267,19 +290,19 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void waitForAccess(PriorityQueue waitQueue) {
 			// implement me
-			if (waitingQ != null) // illegal to be in multile queues
+			if (waitingFor != null) // illegal to be in multile queues
 			{
-				waitingQ.waiting.remove(this);
+				waitingFor.waiting.remove(this);
 			}
 			this.waittime = 0;
 			for (ThreadState t : waitQueue.waiting) {// increment other threads in queue
 				t.waittime++;
 			}
 			waitQueue.waiting.add(this);
-			waitingQ = waitQueue;
-			if (owned != null && owned.contains(waitingQ)) // update set of acquired resources
+			waitingFor = waitQueue;
+			if (owned != null && owned.contains(waitingFor)) // update set of acquired resources
 			{
-				owned.remove(waitingQ);
+				owned.remove(waitingFor);
 			}
 		}
 
@@ -295,10 +318,10 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void acquire(PriorityQueue waitQueue) {
 			// implement me
-			if (waitingQ != null) {
-				if (waitingQ == waitQueue) {
-					waitingQ.waiting.remove(this);// stop waiting
-					waitingQ = null;
+			if (waitingFor != null) {
+				if (waitingFor == waitQueue) {
+					waitingFor.waiting.remove(this);// stop waiting
+					waitingFor = null;
 				}
 			}
 			if (waitQueue.owner != null && waitQueue.owner != this) {
@@ -317,13 +340,13 @@ public class PriorityScheduler extends Scheduler {
 					if (res.waiting.last().epriority > newEffectivePriority)
 						newEffectivePriority = res.waiting.last().epriority;
 			if (newEffectivePriority != epriority) {
-				if (this.waitingQ != null)
-					this.waitingQ.waiting.remove(this);
+				if (this.waitingFor != null)
+					this.waitingFor.waiting.remove(this);
 				epriority = newEffectivePriority;
-				if (this.waitingQ != null) {
-					this.waitingQ.waiting.add(this);
-					Lib.assertTrue(this.waitingQ.owner != null);
-					updatePriority(getThreadState(this.waitingQ.owner.thread));
+				if (this.waitingFor != null) {
+					this.waitingFor.waiting.add(this);
+					Lib.assertTrue(this.waitingFor.owner != null);
+					updatePriority(getThreadState(this.waitingFor.owner.thread));
 				}
 			}
 		}
@@ -331,10 +354,14 @@ public class PriorityScheduler extends Scheduler {
 		/** The thread with which this object is associated. */
 		protected KThread thread;
 		/** The priority of the associated thread. */
-		protected int priority;
-		protected int epriority = priority;
-		public int waittime = 0;
-		PriorityQueue waitingQ;
+		protected int priority =priorityDefault;
+		/** The effective priority of the associated thread. */
+		protected int epriority = priorityDefault;
+		/** The time thread began waiting. */
+		protected int waittime = 0;
+		/** The ThreadQueue that the associated thread waiting for. */
+		PriorityQueue waitingFor = null;
+		/** The hashset sotring donated priorities  */
 		HashSet<PriorityQueue> owned = new HashSet<PriorityQueue>();
 
 	}
@@ -358,6 +385,43 @@ public class PriorityScheduler extends Scheduler {
 			else
 				return t1.getEffectivePriority() - t2.getEffectivePriority();
 		}
-
+}
+	public static void selfTest() {
+		System.out.println("PriorityScheduler test:");
+		PriorityScheduler s = new PriorityScheduler();
+		ThreadQueue queue = s.newThreadQueue(true);
+		ThreadQueue queue2 = s.newThreadQueue(true);
+		ThreadQueue queue3 = s.newThreadQueue(true);
+		
+		KThread thread1 = new KThread();
+		KThread thread2 = new KThread();
+		KThread thread3 = new KThread();
+		KThread thread4 = new KThread();
+		KThread thread5 = new KThread();
+		thread1.setName("thread1");
+		thread2.setName("thread2");
+		thread3.setName("thread3");
+		thread4.setName("thread4");
+		thread5.setName("thread5");
+		boolean intStatus = Machine.interrupt().disable();
+		
+		queue3.acquire(thread1);
+		queue.acquire(thread1);
+		queue.waitForAccess(thread2);
+		queue2.acquire(thread4);
+		queue2.waitForAccess(thread1);
+		System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
+		System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
+		System.out.println("thread4 EP="+s.getThreadState(thread4).getEffectivePriority());
+		
+		s.getThreadState(thread2).setPriority(4);
+		
+		System.out.println("After setting thread2's EP=4:");
+		System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
+		System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
+		System.out.println("thread4 EP="+s.getThreadState(thread4).getEffectivePriority());
+		
+		Machine.interrupt().restore(intStatus);
+		System.out.println("--------End PriorityScheduler test------------------");
 	}
 }
