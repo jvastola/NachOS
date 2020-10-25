@@ -462,8 +462,8 @@ public class KThread {
         thread1.setName("thread1");
         thread2.setName("thread2");
         thread1.fork();
-        thread1.join();
         thread2.fork();
+        thread1.join();
         thread2.join();
     }
 
