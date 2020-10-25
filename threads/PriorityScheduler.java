@@ -130,7 +130,7 @@ public class PriorityScheduler extends Scheduler {
     protected class PriorityQueue extends ThreadQueue {
 	PriorityQueue(boolean transferPriority) {
 		this.transferPriority = transferPriority;
-			if (transferPriority)	// use different comparators to sort set depending on donations enabling
+			if (transferPriority)
 				waiting = new TreeSet<ThreadState>(new PriorityComparator());
 			else
 				waiting = new TreeSet<ThreadState>(new EffectivePriorityComparator());
@@ -139,10 +139,9 @@ public class PriorityScheduler extends Scheduler {
 	public int max(int x, int y) {
 		return x>y ? x : y;
 	}
-	public void donationUpdate()//update resource owner from donations
-	{
+	public void donationUpdate(){//update resource owner from donations
 		if (owner != null){
-			owner.updatePriority();
+			owner.updatePriority();//get newest priority
 			for (PriorityQueue p : owner.owned){//iterate through every resource queue
 				if (!p.waiting.isEmpty())
 					for (ThreadState t : p.waiting){
@@ -169,7 +168,7 @@ public class PriorityScheduler extends Scheduler {
 			ThreadState nextThread = this.pickNextThread();
 			if (nextThread == null)//null if nothing queued
 				return null;
-			nextThread.acquire(this);//aquire nextthread
+			nextThread.acquire(this);//acquire nextthread
 			return nextThread.thread;
 	}
 
@@ -263,7 +262,7 @@ public class PriorityScheduler extends Scheduler {
 			if (waitingFor != null) {
 				waitingFor.waiting.remove(this);
 				waitingFor.waiting.add(this);
-				waitingFor.donationUpdate();
+				waitingFor.donationUpdate();//process new priority
 			}
 	}
 
@@ -280,22 +279,19 @@ public class PriorityScheduler extends Scheduler {
 	 * @see	nachos.threads.ThreadQueue#waitForAccess
 	 */
 	public void waitForAccess(PriorityQueue waitQueue) {
-	    if (waitingFor != null)	{	// illegal to be in multiple queues
-			
+	    if (waitingFor != null)	{
 			waitingFor.waiting.remove(this);
 		}
-		this.waittime = 0;		// start waittime from 0
-		for (ThreadState t : waitQueue.waiting)	{	// increment turns of other threads in queue
-		
-			t.waittime++;
+		this.waittime = 0;
+		for (ThreadState t : waitQueue.waiting)	{
+			t.waittime++;//increment time for other threads in queue
 		}
 		waitQueue.waiting.add(this);
 		waitingFor = waitQueue;
-		if (owned != null && owned.contains(waitingFor))		// update set of acquired resources
-		{
+		if (owned != null && owned.contains(waitingFor)){
 			owned.remove(waitingFor);
 		}
-		waitQueue.donationUpdate();		// process donations in queue, since a new thread is queued
+		waitQueue.donationUpdate();//process donations in queue
 	
 	}
 
@@ -311,31 +307,31 @@ public class PriorityScheduler extends Scheduler {
 	 */
 	public void acquire(PriorityQueue waitQueue) {
 		if (waitingFor != null)	{// stop waiting, since thread has acquired it
-			
 			if (waitingFor == waitQueue){
 				waitingFor.waiting.remove(this);
 				waitingFor = null;
 			}
 		}
 		waitQueue.waiting.remove(this);
-		owned.add(waitQueue);	// update set of acquired resources
+		owned.add(waitQueue);//update set of acquired resources
 
-		if (waitQueue.owner != null && waitQueue.owner != this){// replace previous resource owner and update its priority
+		if (waitQueue.owner != null && waitQueue.owner != this){
+			// replace previous resource owner and update its priority
 			waitQueue.owner.owned.remove(waitQueue);
 			waitQueue.owner.updatePriority();
 		}
 		waitQueue.owner = this;
 		waitQueue.donationUpdate();	// process donations, since new thread acquired the resource
 	}	
-	public void updatePriority(){// update effective priority for this ThreadState
+	public void updatePriority(){
 			this.ePriority = this.priority;
 			if (owned != null)
 				for (PriorityQueue Q : owned){
-					for (ThreadState t : Q.waiting){
+					for (ThreadState t : Q.waiting){//depending threads
 						if(t.getEffectivePriority()>this.ePriority){
 							this.ePriority = t.getEffectivePriority();
 							if (waitingFor != null && waitingFor.owner != null)
-								waitingFor.owner.updatePriority();
+								waitingFor.owner.updatePriority();//update owners priority
 						}
 					}
 				}
