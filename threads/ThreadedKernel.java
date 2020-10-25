@@ -51,7 +51,8 @@ public class ThreadedKernel extends Kernel {
 	SynchList.selfTest();
 	if (Machine.bank() != null) {
 	    ElevatorBank.selfTest();
-	}
+    }
+    Alarm.alarmTest1();
     }
     
     /**

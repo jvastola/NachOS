@@ -148,7 +148,6 @@ public class PriorityScheduler extends Scheduler {
 		public KThread nextThread() {
 			Lib.assertTrue(Machine.interrupt().disabled());
 			// implement me
-			
 			//print();
 			ThreadState nextThread = this.pickNextThread();
 			if (nextThread == null)
@@ -248,7 +247,6 @@ public class PriorityScheduler extends Scheduler {
 
 			// implement me
 			this.updatePriority(this);
-
 			if (waitingQ != null) {// update priority in
 				waitingQ.waiting.remove(this);
 				waitingQ.waiting.add(this);

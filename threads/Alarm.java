@@ -1,4 +1,5 @@
 package nachos.threads;
+import java.util.PriorityQueue;
 
 import nachos.machine.*;
 
@@ -7,6 +8,11 @@ import nachos.machine.*;
  * until a certain time.
  */
 public class Alarm {
+    /**
+     * 
+     */
+    PriorityQueue<SleepBundle> sleepQueue;
+
     /**
      * Allocate a new Alarm. Set the machine's timer interrupt handler to this
      * alarm's callback.
@@ -17,7 +23,9 @@ public class Alarm {
     public Alarm() {
 	Machine.timer().setInterruptHandler(new Runnable() {
 		public void run() { timerInterrupt(); }
-	    });
+        });
+        
+        sleepQueue = new PriorityQueue<>();
     }
 
     /**
@@ -27,7 +35,17 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-	KThread.currentThread().yield();
+        KThread.currentThread().yield();
+        
+        long currTime = Machine.timer().getTime();
+
+        //Check the top most element of the queue (if its not empty) and see if its past its wakeup time
+        //While loop is used here to make sure that all threads that need to be awoken at this time is awoken at the same time
+        while(!sleepQueue.isEmpty() && sleepQueue.peek().wakeUpTime <= currTime) {
+            //Remove the thread from the sleep queue and put it on the ready queue
+            sleepQueue.poll().thread.ready();
+        }
+
     }
 
     /**
@@ -45,9 +63,41 @@ public class Alarm {
      * @see	nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+        //Check if x is invalid (0 or negative)
+        if(x <= 0) {
+            return;
+        }
+
+        //Add thread to queue based on its wake up time (x + Timer.getTime());
+        long wakeUpTime = Machine.timer().getTime() + x;
+
+        //Create a new sleepbundle with out current thread and the time to wake it up at
+        SleepBundle toAdd = new SleepBundle(KThread.currentThread(), wakeUpTime);
+
+        //Put thread to sleep on the lock inside sleep bundle
+        toAdd.sleepLock.acquire();
+
+        //Add the bundle to our sleep queue
+        sleepQueue.add(toAdd);
+
+        //Put thread to sleep on its sleepCond
+        toAdd.sleepCond.sleep();
+    }
+
+
+    //Testing methods
+    public static void alarmTest1() {
+        int durations[] = {0, 20, 500, 1000000};
+        long t0, t1;
+        for (int d : durations) {    
+            t0 = Machine.timer().getTime();    
+            ThreadedKernel.alarm.waitUntil (d);    
+            t1 = Machine.timer().getTime();    
+            System.out.println ("alarmTest1: waited for " + (t1 - t0) + " ticks");
+        }
+    }
+
+    public static void selfTest() {
+        alarmTest1();
     }
 }
