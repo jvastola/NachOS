@@ -25,7 +25,8 @@ public class UserProcess {
 	final int MAX_NAME_LENGTH = 256;
 	final int fdStandardInput = 0;
 	final int fdStandardOutput = 1;
-	OpenFile[] fdTable = new OpenFile[8];	//might need to be changed
+	final int MAX_PROCESSES = 16;
+	OpenFile[] fdTable = new OpenFile[MAX_PROCESSES];	//might need to be changed
 	
     public UserProcess() {
     fdTable[fdStandardInput] = UserKernel.console.openForReading();
