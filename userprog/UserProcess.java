@@ -422,7 +422,7 @@ public class UserProcess {
 
     private int close(int fd) {
     	//check if fd is in bounds
-    	if (fd < 8 && fd >= 2) {					
+    	if (fd < MAX_PROCESSES && fd >= 2) {					
     		fdTable[fd].close();	
     		fdTable[fd] = null;		
     		return 0;
