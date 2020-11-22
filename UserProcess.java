@@ -23,20 +23,12 @@ public class UserProcess {
      * Allocate a new process.
      */
 	final int MAX_NAME_LENGTH = 256;
-	final int fdStandardInput = 0;
-	final int fdStandardOutput = 1;
-	final int MAX_PROCESSES = 16;
-	OpenFile[] fdTable = new OpenFile[MAX_PROCESSES];	//might need to be changed
-	
     public UserProcess() {
-    fdTable[fdStandardInput] = UserKernel.console.openForReading();
-    fdTable[fdStandardOutput] = UserKernel.console.openForWriting();
 	int numPhysPages = Machine.processor().getNumPhysPages();
 	pageTable = new TranslationEntry[numPhysPages];
 	for (int i=0; i<numPhysPages; i++)
 	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
     }
-    
     
     /**
      * Allocate and return a new process of the correct class. The class name
@@ -343,16 +335,7 @@ public class UserProcess {
 	processor.writeRegister(Processor.regA0, argc);
 	processor.writeRegister(Processor.regA1, argv);
     }
-    private int getFD() {
-    	int i, flag = -1;
-    	//start at 2 bc 0 and 1 are reserved
-    	for (i = 2; i < MAX_PROCESSES; i++) {
-    		if (fdTable[i] == null && flag == -1) {
-    			flag = i;
-    		}
-    	}
-    	return flag;
-    }
+
     /**
      * Handle the halt() system call. 
      */
@@ -365,94 +348,82 @@ public class UserProcess {
     }
     
     private int creat(String name) {
-    	int flag = -1, fd;
+    	int fd = 0, i;
+    	boolean flag = false;
     	//find available file descriptor
-    	fd = getFD();
+    	for (i = 0; i < numPages; i++) {
+    		if (pageTable[i] == null && !flag) {
+    			fd = i;
+    			flag = true;
+    		}
+    	}
     	//returns -1 if no file descriptors are available
-    	if (fd >= 2) {
+    	if (flag) {
     		OpenFile file = ThreadedKernel.fileSystem.open(name, true);
     		//checks for invalid file name
     		if (file == null) {
-    			//do nothing - will return -1
+    			return -1;
     		} else {
-    			fdTable[fd] = file; 	//binds file descriptor to file
-    			flag = fd;
+    			//pageTable[fd] = file; 	must bind fd to file
+    			return fd;
     		}
     	} else {
-    		//do nothing - will return -1
+    		Lib.assertNotReached("CREATE FAILED");
+    		return -1;
     	}
-    	return flag;
     }
     
     private int open(String name) {
-    	int flag = -1, fd;
+    	int fd = 0, i;
+    	boolean flag = false;
     	//find available file descriptor
-    	fd = getFD();
+    	for (i = 0; i < numPages; i++) {
+    		if (pageTable[i] == null && !flag) {
+    			fd = i;
+    			flag = true;
+    		}
+    	}
     	//returns -1 if no file descriptors are available
-    	if (fd >= 2) {
+    	if (flag) {
     		OpenFile file = ThreadedKernel.fileSystem.open(name, false);	//only difference from creat
     		//checks for invalid file name
     		if (file == null) {
-    			//do nothing - will return -1
+    			return -1;
     		} else {
-    			fdTable[fd] = file; 	//binds file descriptor to file
-    			flag = fd;
+    			//pageTable[fd] = file; 	must bind fd to file (replace pageTable with fd table)
+    			return fd;
     		}
     	} else {
-    		//do nothing - will return -1
+    		Lib.assertNotReached("CREATE FAILED");
+    		return -1;
     	}
-    	return flag;
     }
 
-    private int read(int fd, int address, int count) {
-		if(fd >= MAX_PROCESSES || fd < 0) {
-			return -1;
-		} 
-
-		OpenFile file = fdTable[fd];
-		if(file == null) {
-			return -1;
-		}
-
-		FileSystem fs = file.getFileSystem();
-		byte[] toRead = new byte[count];
+    private int read(int fileDescriptor, void *buffer, int count) {
+		Byte toRead = new Byte[count];
 		
-		int readCount = file.read(toRead, 0, count);
+		//Get File
+		OpenFile pls = new OpenFile();
 		
-		if(readCount == -1) {
-			return -1;
-		}
-
-		return writeVirtualMemory(address, toRead);
+    	
+    	
+		Lib.assertNotReached("READ FAILED");
+		return 0;
     }
     
-    private int write(int fd, int address, int count) {
-		if(fd >= MAX_PROCESSES || fd < 0) {
-			return -1;
-		}
+    private int write(int fileDescriptor, void *buffer, int count) {
 
-		OpenFile file = fdTable[fd];
-		if(file == null) {
-			return -1;
-		}
-
-		FileSystem fs = file.getFileSystem();
-		byte[] toWrite = new byte[count];
-
-		int writeCount = file.write(toWrite, 0, count);
-		
-		if(writeCount == -1 || writeCount != count) {
-			return -1;
-		}
-
-		return writeCount;
+    	
+    	
+	Lib.assertNotReached("WRITE FAILED");
+	return 0;
     }
 
     private int close(int fd) {
-    	//check if fd is in bounds
-    	if (fd < MAX_PROCESSES && fd >= 2) {					
-    		fdTable[fd].close();	
-    		fdTable[fd] = null;		
+    	//check if fd is out of bounds
+    	if (fd < 16) {					//needs a helper fn
+    		//pageTable[fd].close();	replace pageTable with fd table
+    		//pageTable[fd] = null;		replace pageTable with fd table
     		return 0;
     	} else {
     		return -1;
@@ -465,7 +436,7 @@ public class UserProcess {
     	if (flag) {
     		return 0;
     	} else {
-    		return -1;
+    		return 1;
     	}
     }
     
@@ -522,6 +493,7 @@ public class UserProcess {
 		break;			//will most likely be replaced by a return
 	case syscallCreate:
 		name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+		
 		//check for invalid file name
 		if (name == null) {
 			return -1;
@@ -531,6 +503,7 @@ public class UserProcess {
 		
 	case syscallOpen:
 		name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+		
 		//check for invalid file name
 		if (name == null) {
 			return -1;
@@ -538,20 +511,20 @@ public class UserProcess {
 			return open(name);
 		}
 	case syscallRead:
-	    return read(a0, a1, a2);	//unsure where to get buffer from
+	    //return read(a0, buffer, a2);	//unsure where to get buffer from
 	case syscallWrite:
-	    return write(a0, a1, a2);	//unsure where to get buffer from
+	    //return write(a0, buffer, a2);	//unsure where to get buffer from
 	case syscallClose:
 		return close(a0);
 	case syscallUnlink:
 		name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+		
 		//check for invalid file name
-		//*****not checking if name is null might cause errors but think this makes sense logically
-//		if (name == null) {
-//			return -1;
-//		} else {
+		if (name == null) {
+			return -1;
+		} else {
 			return unlink(name);
-//		}
+		}
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 	    Lib.assertNotReached("Unknown system call!");
