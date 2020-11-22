@@ -346,7 +346,7 @@ public class UserProcess {
     private int getFD() {
     	int i, flag = -1;
     	//start at 2 bc 0 and 1 are reserved
-    	for (i = 2; i < numPages; i++) {
+    	for (i = 2; i < MAX_PROCESSES; i++) {
     		if (fdTable[i] == null && flag == -1) {
     			flag = i;
     		}
