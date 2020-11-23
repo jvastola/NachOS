@@ -229,7 +229,7 @@ public class LotteryScheduler extends PriorityScheduler {
      *
      * @param	thread	the thread this state belongs to.
      */
-    public NewThreadState(KThread thread) {
+    public ThreadState(KThread thread) {
         this.thread = thread;
         
         setPriority(priorityDefault);
@@ -290,7 +290,7 @@ public class LotteryScheduler extends PriorityScheduler {
             waitingFor.waiting.remove(this);
         }
         this.waittime = 0;
-        for (NewThreadState t : waitQueue.waiting)	{
+        for (ThreadState t : waitQueue.waiting)	{
             t.waittime++;//increment time for other threads in queue
         }
         waitQueue.waiting.add(this);
@@ -334,7 +334,7 @@ public class LotteryScheduler extends PriorityScheduler {
             this.ePriority = this.priority;
             if (owned != null)
                 for (PriorityQueue Q : owned){
-                    for (NewThreadState t : Q.waiting){//depending threads
+                    for (ThreadState t : Q.waiting){//depending threads
                         if(t.getEffectivePriority()>this.ePriority){
                             this.ePriority = t.getEffectivePriority();
                             if (waitingFor != null && waitingFor.owner != null)
@@ -359,19 +359,19 @@ public class LotteryScheduler extends PriorityScheduler {
     
     
     
-    class PriorityComparator implements Comparator<NewThreadState>
+    class PriorityComparator implements Comparator<ThreadState>
     {
         @Override
-        public int compare(NewThreadState t1, NewThreadState t2) {
+        public int compare(ThreadState t1, ThreadState t2) {
             if (t1.getPriority() == t2.getPriority()) return t1.waittime - t2.waittime;
             else return t1.getPriority() - t2.getPriority();
         }
     }
 
-    class EffectivePriorityComparator implements Comparator<NewThreadState>
+    class EffectivePriorityComparator implements Comparator<ThreadState>
     {
         @Override
-        public int compare(NewThreadState t1, NewThreadState t2) {
+        public int compare(ThreadState t1, ThreadState t2) {
             if (t1.getEffectivePriority() == t2.getEffectivePriority()) return t1.waittime - t2.waittime;
             else return t1.getEffectivePriority() - t2.getEffectivePriority();
         }
@@ -397,27 +397,27 @@ public class LotteryScheduler extends PriorityScheduler {
         queue1.waitForAccess(thread2);
         queue2.acquire(thread3);
         queue2.waitForAccess(thread1);
-        System.out.println("thread1 EP="+s.getNewThreadState(thread1).getEffectivePriority());
-        System.out.println("thread2 EP="+s.getNewThreadState(thread2).getEffectivePriority());
-        System.out.println("thread4 EP="+s.getNewThreadState(thread3).getEffectivePriority());
+        System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
+        System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
+        System.out.println("thread4 EP="+s.getThreadState(thread3).getEffectivePriority());
         
-        s.getNewThreadState(thread1).setPriority(1);
-        s.getNewThreadState(thread2).setPriority(3);
-        s.getNewThreadState(thread3).setPriority(4);
+        s.getThreadState(thread1).setPriority(1);
+        s.getThreadState(thread2).setPriority(3);
+        s.getThreadState(thread3).setPriority(4);
         
         System.out.println("Thread1: 1, Thread2: 3, Thread3:4");
-        System.out.println("thread1 EP="+s.getNewThreadState(thread1).getEffectivePriority());
-        System.out.println("thread1 P="+s.getNewThreadState(thread1).getPriority());
-        System.out.println("thread2 EP="+s.getNewThreadState(thread2).getEffectivePriority());
-        System.out.println("thread4 EP="+s.getNewThreadState(thread3).getEffectivePriority());
+        System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
+        System.out.println("thread1 P="+s.getThreadState(thread1).getPriority());
+        System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
+        System.out.println("thread4 EP="+s.getThreadState(thread3).getEffectivePriority());
         
-        s.getNewThreadState(thread1).setPriority(4);
-        s.getNewThreadState(thread2).setPriority(2);
-        s.getNewThreadState(thread3).setPriority(1);
+        s.getThreadState(thread1).setPriority(4);
+        s.getThreadState(thread2).setPriority(2);
+        s.getThreadState(thread3).setPriority(1);
         
         System.out.println("Thread1: 4, Thread2: 3, Thread3:1");
-        System.out.println("thread1 EP="+s.getNewThreadState(thread1).getEffectivePriority());
-        System.out.println("thread2 EP="+s.getNewThreadState(thread2).getEffectivePriority());
+        System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
+        System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
         System.out.println("thread4 EP="+s.getNewThreadState(thread3).getEffectivePriority());
         
         Machine.interrupt().restore(intStatus);
