@@ -28,29 +28,18 @@ import java.util.Random;
  * the maximum).
  */
 public class LotteryScheduler extends PriorityScheduler {
-    /**
-     * Allocate a new lottery scheduler.
-     */
+    /** Allocate a new lottery scheduler.*/
     public LotteryScheduler() {
     }
     public static final int priorityDefault = 1;
-
     public static final int priorityMinimum = 1;
-
     public static final int priorityMaximum = Integer.MAX_VALUE;    
 
     public ThreadQueue newThreadQueue(boolean transferPriority) {
         return new LotteryQueue(transferPriority);
         }
     protected class LotteryQueue extends PriorityQueue {
-        LotteryQueue(boolean transferPriority) {
-        this.transferPriority = transferPriority;
-            if (transferPriority)
-                waiting = new TreeSet<ThreadState>(new PriorityComparator());
-            else
-                waiting = new TreeSet<ThreadState>(new EffectivePriorityComparator());
-        }
-        protected LotteryThreadState pickNextThread() {
+        protected ThreadState pickNextThread() {
             donationUpdate();
             ThreadState ret = null;
             int totalTickets = getTotalTickets();
@@ -68,22 +57,10 @@ public class LotteryScheduler extends PriorityScheduler {
         }
         public int getTotalTickets() {
             int totalTickets = 0; 
-            for (LotteryThreadState t : waiting) totalTickets += getThreadState(t.getThread()).getEffectivePriority();
+            for (ThreadState t : waiting) totalTickets += getThreadState(t.getThread()).getEffectivePriority();
             return totalTickets;
         }   
-        TreeSet<LotteryThreadState> waiting;
-    }
-    protected class LotteryThreadState extends ThreadState{
-
-        public LotteryThreadState(KThread thread) {
-            this.thread = thread;
-            setPriority(priorityDefault);
-            getEffectivePriority();
-        }
-        public KThread getThread() {	
-            return thread;	
-        }
-        protected LotteryQueue waitingFor= null;
+        TreeSet<ThreadState> waiting;
     }
 }
     
