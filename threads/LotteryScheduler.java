@@ -6,6 +6,7 @@ import java.util.TreeSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.Comparator;
 
 /**
  * A scheduler that chooses threads using a lottery.
@@ -39,6 +40,12 @@ public class LotteryScheduler extends PriorityScheduler {
         return new LotteryQueue(transferPriority);
         }
     protected class LotteryQueue extends PriorityQueue {
+        LotteryQueue(){
+            TreeSet<ThreadState> waiting = new TreeSet<ThreadState>;
+        }
+        LotteryQueue(boolean transferPriority){
+            TreeSet<ThreadState> waiting = new TreeSet<ThreadState>;
+        }
         protected ThreadState pickNextThread() {
             donationUpdate();
             ThreadState ret = null;
