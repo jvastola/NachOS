@@ -5,6 +5,8 @@ import nachos.machine.*;
 import java.util.TreeSet;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Random;
+import java.util.Comparator;
 
 /**
  * A scheduler that chooses threads using a lottery.
@@ -27,22 +29,43 @@ import java.util.Iterator;
  * the maximum).
  */
 public class LotteryScheduler extends PriorityScheduler {
-    /**
-     * Allocate a new lottery scheduler.
-     */
+    /** Allocate a new lottery scheduler.*/
     public LotteryScheduler() {
     }
-    
-    /**
-     * Allocate a new lottery thread queue.
-     *
-     * @param	transferPriority	<tt>true</tt> if this queue should
-     *					transfer tickets from waiting threads
-     *					to the owning thread.
-     * @return	a new lottery thread queue.
-     */
+    public static final int priorityDefault = 1;
+    public static final int priorityMinimum = 1;
+    public static final int priorityMaximum = Integer.MAX_VALUE;    
+
     public ThreadQueue newThreadQueue(boolean transferPriority) {
-	// implement me
-	return null;
+        return new LotteryQueue();
+        }
+    protected class LotteryQueue extends PriorityQueue {
+        LotteryQueue(){
+            TreeSet<ThreadState> waiting = new TreeSet<ThreadState>();
+        }
+        protected ThreadState pickNextThread() {
+            donationUpdate();
+            ThreadState ret = null;
+            int totalTickets = getTotalTickets();
+            if(totalTickets>0){
+                int choose = (new Random()).nextInt(totalTickets) + 1;
+                for(ThreadState thread: waiting){
+                    choose-= getThreadState(thread.getThread()).getEffectivePriority();
+                    if(choose<=0){
+                        ret = getThreadState(thread.getThread());
+                        break;
+                    }
+                }
+            }
+            return ret;
+        }
+        public int getTotalTickets() {
+            int totalTickets = 0; 
+            for (ThreadState t : waiting) totalTickets += getThreadState(t.getThread()).getEffectivePriority();
+            return totalTickets;
+        }   
+        TreeSet<ThreadState> waiting;
     }
 }
+    
+    
