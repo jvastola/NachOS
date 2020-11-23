@@ -29,7 +29,6 @@ import java.util.Comparator;
  * the maximum).
  */
 public class LotteryScheduler extends PriorityScheduler {
-    /** Allocate a new lottery scheduler.*/
     public LotteryScheduler() {
     }
     public static final int priorityDefault = 1;
@@ -37,30 +36,24 @@ public class LotteryScheduler extends PriorityScheduler {
     public static final int priorityMaximum = Integer.MAX_VALUE;    
 
     public ThreadQueue newThreadQueue(boolean transferPriority) {
-        return new LotteryQueue(transferPriority);
+        return new LotteryQueue();
         }
     protected class LotteryQueue extends PriorityQueue {
-        LotteryQueue(){
-            TreeSet<ThreadState> waiting = new TreeSet<ThreadState>;
-        }
         LotteryQueue(boolean transferPriority){
-            TreeSet<ThreadState> waiting = new TreeSet<ThreadState>;
+            super(transferPriority)  ;
         }
         protected ThreadState pickNextThread() {
-            donationUpdate();
             ThreadState ret = null;
             int totalTickets = getTotalTickets();
             if(totalTickets>0){
                 int choose = (new Random()).nextInt(totalTickets) + 1;
-                for(KThread thread: waiting){
-                    choose-= getThreadState(thread).getEffectivePriority();
-                    if(choose<=0){
-                        ret = getThreadState(thread);
-                        break;
+                for(ThreadState thread: waiting){
+                    choose+= getThreadState(thread.getThread()).getEffectivePriority();
+                    if(choose<=sum){
+                        return ret;
                     }
                 }
             }
-            return ret;
         }
         public int getTotalTickets() {
             int totalTickets = 0; 
@@ -68,6 +61,29 @@ public class LotteryScheduler extends PriorityScheduler {
             return totalTickets;
         }   
         TreeSet<ThreadState> waiting;
+    }
+    protected class LotteryThreadState extends ThreadState{
+        public LotteryThreadState(KThread thread) {
+			super(thread);
+        }
+        public int getEffectivePriority() {
+            HashSet<LotteryThreadState> threadSet= new HashSet<LotteryThreadState>();
+            if (threadSet.contains(this)) {
+				return priority;
+			}
+			ePriority = priority;
+
+			for (PriorityQueue pq : donateQueue)
+				if (pq.transferPriority)
+					for (KThread thread : pq.waitQueue) {
+						threadSet.add(this);
+						ePriority += getThreadState(thread)
+								.getEffectivePriority(threadSet);
+						threadSet.remove(this);
+					}
+
+			return ePriority;
+        }
     }
 }
     
