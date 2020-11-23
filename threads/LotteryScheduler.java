@@ -67,7 +67,9 @@ public class LotteryScheduler extends PriorityScheduler {
 			super(thread);
         }
         public int getEffectivePriority() {
-            HashSet<LotteryThreadState> threadSet= new HashSet<LotteryThreadState>();
+			return getEffectivePriority(new HashSet<LotteryThreadState>());
+		}
+        public int getEffectivePriority(HashSet<LotteryThreadState> threadSet) {
             if (threadSet.contains(this)) {
 				return priority;
 			}
