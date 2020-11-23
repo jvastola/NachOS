@@ -49,13 +49,13 @@ public class LotteryScheduler extends PriorityScheduler {
     public int getPriority(KThread thread) {
     Lib.assertTrue(Machine.interrupt().disabled());
                 
-    return getNewThreadState(thread).getPriority();
+    return getThreadState(thread).getPriority();
     }
 
     public int getEffectivePriority(KThread thread) {
     Lib.assertTrue(Machine.interrupt().disabled());
                 
-    return getNewThreadState(thread).getEffectivePriority();
+    return getThreadState(thread).getEffectivePriority();
     }
 
     public void setPriority(KThread thread, int priority) {
@@ -64,7 +64,7 @@ public class LotteryScheduler extends PriorityScheduler {
     Lib.assertTrue(priority >= priorityMinimum &&
             priority <= priorityMaximum);
     
-    getNewThreadState(thread).setPriority(priority);
+    getThreadState(thread).setPriority(priority);
     }
 
     public boolean increasePriority() {
@@ -116,11 +116,11 @@ public class LotteryScheduler extends PriorityScheduler {
      * @param	thread	the thread whose scheduling state to return.
      * @return	the scheduling state of the specified thread.
      */
-    protected NewThreadState getNewThreadState(KThread thread) {
+    protected ThreadState getThreadState(KThread thread) {
     if (thread.schedulingState == null)
-        thread.schedulingState = new NewThreadState(thread);
+        thread.schedulingState = new ThreadState(thread);
 
-    return (NewThreadState) thread.schedulingState;
+    return (ThreadState) thread.schedulingState;
     }
 
     /**
@@ -130,9 +130,9 @@ public class LotteryScheduler extends PriorityScheduler {
     LotteryQueue(boolean transferPriority) {
         this.transferPriority = transferPriority;
             if (transferPriority)
-                waiting = new TreeSet<NewThreadState>(new PriorityComparator());
+                waiting = new TreeSet<ThreadState>(new PriorityComparator());
             else
-                waiting = new TreeSet<NewThreadState>(new EffectivePriorityComparator());
+                waiting = new TreeSet<ThreadState>(new EffectivePriorityComparator());
     }
     
     public int max(int x, int y) {
@@ -143,7 +143,7 @@ public class LotteryScheduler extends PriorityScheduler {
             owner.updatePriority();//get newest priority
             for (PriorityQueue p : owner.owned){//iterate through every resource queue
                 if (!p.waiting.isEmpty())
-                    for (NewThreadState t : p.waiting){
+                    for (ThreadState t : p.waiting){
                         t.updatePriority();	// update every depending thread's effective priority 
                         owner.ePriority=max(t.ePriority,owner.ePriority);
                     }
@@ -153,18 +153,18 @@ public class LotteryScheduler extends PriorityScheduler {
 
     public void waitForAccess(KThread thread) {
         Lib.assertTrue(Machine.interrupt().disabled());
-        getNewThreadState(thread).waitForAccess(this);
+        getThreadState(thread).waitForAccess(this);
     }
 
     public void acquire(KThread thread) {
         Lib.assertTrue(Machine.interrupt().disabled());
-        getNewThreadState(thread).acquire(this);
+        getThreadState(thread).acquire(this);
     }
 
     public KThread nextThread() {
         Lib.assertTrue(Machine.interrupt().disabled());
             //print();
-            NewThreadState nextThread = this.pickNextThread();
+            ThreadState nextThread = this.pickNextThread();
             if (nextThread == null)//null if nothing queued
                 return null;
             nextThread.acquire(this);//acquire nextthread
@@ -178,16 +178,16 @@ public class LotteryScheduler extends PriorityScheduler {
      * @return	the next thread that <tt>nextThread()</tt> would
      *		return.
         */
-    protected NewThreadState pickNextThread() {
+    protected ThreadState pickNextThread() {
         donationUpdate();
-        NewThreadState ret = null;
+        ThreadState ret = null;
         int totalTickets = getTotalTickets();
         if(totalTickets>0){
             int choose = (new Random()).nextInt(totalTickets) + 1;
             for(KThread thread: waiting){
-                choose-= getNewThreadState(thread).getEffectivePriority();
+                choose-= getThreadState(thread).getEffectivePriority();
                 if(choose<=0){
-                    ret = getNewThreadState(thread);
+                    ret = getThreadState(thread);
                     break;
                 }
             }
@@ -196,7 +196,7 @@ public class LotteryScheduler extends PriorityScheduler {
     }
     public int getTotalTickets() {
         int totalTickets = 0; 
-        for (NewThreadState t : waiting) totalTickets += getNewThreadState(t.getThread()).getEffectivePriority();
+        for (ThreadState t : waiting) totalTickets += getThreadState(t.getThread()).getEffectivePriority();
         return totalTickets;
     }
     
@@ -210,9 +210,9 @@ public class LotteryScheduler extends PriorityScheduler {
      */
     public boolean transferPriority;
         /** The main treeset of waiting threads */	   
-    TreeSet<NewThreadState> waiting;
-    /** The NewThreadState indicating which thread acquires priority */	   
-    NewThreadState owner = null;
+    TreeSet<ThreadState> waiting;
+    /** The ThreadState indicating which thread acquires priority */	   
+    ThreadState owner = null;
     }
 
     /**
@@ -222,9 +222,9 @@ public class LotteryScheduler extends PriorityScheduler {
      *
      * @see	nachos.threads.KThread#schedulingState
      */
-    protected class NewThreadState {
+    protected class ThreadState {
     /**
-     * Allocate a new <tt>NewThreadState</tt> object and associate it with the
+     * Allocate a new <tt>ThreadState</tt> object and associate it with the
      * specified thread.
      *
      * @param	thread	the thread this state belongs to.
@@ -418,7 +418,7 @@ public class LotteryScheduler extends PriorityScheduler {
         System.out.println("Thread1: 4, Thread2: 3, Thread3:1");
         System.out.println("thread1 EP="+s.getThreadState(thread1).getEffectivePriority());
         System.out.println("thread2 EP="+s.getThreadState(thread2).getEffectivePriority());
-        System.out.println("thread4 EP="+s.getNewThreadState(thread3).getEffectivePriority());
+        System.out.println("thread4 EP="+s.getThreadState(thread3).getEffectivePriority());
         
         Machine.interrupt().restore(intStatus);
     }
