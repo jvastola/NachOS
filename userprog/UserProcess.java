@@ -369,7 +369,7 @@ public class UserProcess {
     	//find available file descriptor
     	fd = getFD();
     	//returns -1 if no file descriptors are available
-    	if (fd >= 2) {
+    	if (fd >= 2 && fd < MAX_PROCESSES) {
     		OpenFile file = ThreadedKernel.fileSystem.open(name, true);
     		//checks for invalid file name
     		if (file == null) {
@@ -389,7 +389,7 @@ public class UserProcess {
     	//find available file descriptor
     	fd = getFD();
     	//returns -1 if no file descriptors are available
-    	if (fd >= 2) {
+    	if (fd >= 2 && fd < MAX_PROCESSES) {
     		OpenFile file = ThreadedKernel.fileSystem.open(name, false);	//only difference from creat
     		//checks for invalid file name
     		if (file == null) {
