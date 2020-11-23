@@ -414,7 +414,6 @@ public class UserProcess {
 			return -1;
 		}
 
-		FileSystem fs = file.getFileSystem();
 		byte[] toRead = new byte[count];
 		
 		int readCount = file.read(toRead, 0, count);
@@ -423,7 +422,9 @@ public class UserProcess {
 			return -1;
 		}
 
-		return writeVirtualMemory(address, toRead);
+		writeVirtualMemory(address, toRead);
+
+		return readCount;
     }
     
     private int write(int fd, int address, int count) {
@@ -436,15 +437,19 @@ public class UserProcess {
 			return -1;
 		}
 
-		FileSystem fs = file.getFileSystem();
-		byte[] toWrite = new byte[count];
-
-		int writeCount = file.write(toWrite, 0, count);
+		byte[] buffer = new byte[count];
+		int bufferWriteCount = readVirtualMemory(address, buffer);
 		
-		if(writeCount == -1 || writeCount != count) {
+		if(bufferWriteCount == -1 || bufferWriteCount != count) {
 			return -1;
 		}
 
+		int writeCount = file.write(buffer, 0, count);
+
+		if(writeCount != count) {
+			return -1;
+		} 
+		
 		return writeCount;
     }
 
