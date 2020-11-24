@@ -7,7 +7,8 @@ import nachos.userprog.*;
 import java.io.EOFException;
 
 // Added imports
-import java.util.LinkedList;
+// import java.util.LinkedList;
+import java.util.HashMap;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -32,7 +33,8 @@ public class UserProcess {
             pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
         // Added variable declarations
         pid = pidTracker++; // Maybe problem?
-        children = new LinkedList<Integer>();
+        // children = new LinkedList<Integer>();
+        children = new HashMap<Integer, UserProcess>();
         parent = null;
     }
     
@@ -59,7 +61,8 @@ public class UserProcess {
         if (!load(name, args))
             return false;
         
-        thread = new UThread(this).setName(name).fork(); // Why was this not set to a UThread originally?!?!
+        thread = new UThread(this);
+        thread.setName(name).fork();
 
         return true;
     }
@@ -344,17 +347,22 @@ public class UserProcess {
      * Handle the halt() system call. 
      */
     private int handleHalt(){
-
-        Machine.halt();
-        
-        Lib.assertNotReached("Machine.halt() did not halt machine!");
-        return 0;
+        if(pid == 0){
+            Machine.halt();
+            
+            Lib.assertNotReached("Machine.halt() did not halt machine!");
+            return 0;
+        }
+        else{
+            Lib.debug(dbgProcess, " - Halt was not executed on root");
+            return -1;
+        }
     }
 
     private int join(int pid, int statusAddr){
-        if(statusAddr == null)
-            return -1;
+        if(statusAddr < 0) return 0;
 
+        /*
         // Checks if pid process is child
         UserProcess pidProc = null;
         boolean isChild = false;
@@ -366,19 +374,25 @@ public class UserProcess {
             }
         }
         if(!isChild) return -1;
-
-        
-        /*  Old join code for reference
-        if(this.joined){
-            return;
-        }
-        if(this.status != statusFinished){
-            this.joinQueue.add(currentThread);
-            currentThread.sleep();
-            this.joined = true;
-        }
         */
-        return 0;
+
+        // Checks if pid process is child
+        UserProcess pidProc = children.get(pid);
+        if(pidProc == null) return -1; // pid is not a child of current process
+
+        pidProc.thread.join();
+
+        // From here we assume the above thread.join() is done
+        children.remove(pid);
+        
+        byte[] statusBytes = new byte[Integer.SIZE/8]; // Bytes of integer
+        
+        Lib.bytesFromInt(statusBytes, 0, pidProc.status); // Take status of child and translate to bytes for statusBytes
+        int numBytes = writeVirtualMemory(statusAddr, statusBytes); // Write child status to statusAddr
+        if(numBytes == Integer.SIZE/8)
+            return 1; // Exited normally
+        else
+            return 0; // Exited with an unhandled exception
     }
 
     private static final int
@@ -486,7 +500,8 @@ public class UserProcess {
     // Added class variables
     private int pid;
     private int status;
-    private LinkedList<Integer> children;
+    // private LinkedList<Integer> children;
+    private HashMap<Integer, UserProcess> children;
     private UserProcess parent;
     private static int pidTracker = 0;
     private UThread thread;
