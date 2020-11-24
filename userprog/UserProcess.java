@@ -26,6 +26,13 @@ public class UserProcess {
     /**
      * Allocate a new process.
      */
+
+	final int MAX_NAME_LENGTH = 256;
+	final int fdStandardInput = 0;
+	final int fdStandardOutput = 1;
+	final int MAX_PROCESSES = 16;
+	private OpenFile[] fdTable;
+
     public UserProcess(){
         int numPhysPages = Machine.processor().getNumPhysPages();
         pageTable = new TranslationEntry[numPhysPages];
@@ -36,7 +43,11 @@ public class UserProcess {
         // children = new LinkedList<Integer>();
         children = new HashMap<Integer, UserProcess>();
         parent = null;
+        fdTable = new OpenFile[MAX_PROCESSES];	//might need to be changed
+        fdTable[fdStandardInput] = UserKernel.console.openForReading();
+        fdTable[fdStandardOutput] = UserKernel.console.openForWriting();
     }
+    
     
     /**
      * Allocate and return a new process of the correct class. The class name
@@ -342,7 +353,16 @@ public class UserProcess {
         processor.writeRegister(Processor.regA0, argc);
         processor.writeRegister(Processor.regA1, argv);
     }
-
+    private int getFD() {
+    	int i, flag = -1;
+    	//start at 2 bc 0 and 1 are reserved
+    	for (i = 2; i < MAX_PROCESSES; i++) {
+    		if (fdTable[i] == null && flag == -1) {
+    			flag = i;
+    		}
+    	}
+    	return flag;
+    }
     /**
      * Handle the halt() system call. 
      */
@@ -403,6 +423,93 @@ public class UserProcess {
             return -1;
         
     }
+    
+    private int creat(String name) {
+    	int flag = -1, fd;
+    	//find available file descriptor
+    	fd = getFD();
+    	//returns -1 if no file descriptors are available
+    	if (fd >= 2 && fd < MAX_PROCESSES) {
+    		OpenFile file = ThreadedKernel.fileSystem.open(name, true);
+    		//checks for invalid file name
+    		if (file == null) {
+    			//do nothing - will return -1
+    		} else {
+    			fdTable[fd] = file; 	//binds file descriptor to file
+    			flag = fd;
+    		}
+    	} else {
+    		//do nothing - will return -1
+    	}
+    	return flag;
+    }
+    
+    private int open(String name) {
+    	int flag = -1, fd;
+    	//find available file descriptor
+    	fd = getFD();
+    	//returns -1 if no file descriptors are available
+    	if (fd >= 2 && fd < MAX_PROCESSES) {
+    		OpenFile file = ThreadedKernel.fileSystem.open(name, false);	//only difference from creat
+    		//checks for invalid file name
+    		if (file == null) {
+    			//do nothing - will return -1
+    		} else {
+    			fdTable[fd] = file; 	//binds file descriptor to file
+    			flag = fd;
+    		}
+    	} else {
+    		//do nothing - will return -1
+    	}
+    	return flag;
+    }
+
+    private int read(int fd, int address, int count) {
+		if(fd >= MAX_PROCESSES || fd < 0) {
+			return -1;
+		} 
+
+		OpenFile file = fdTable[fd];
+		if(file == null) {
+			return -1;
+		}
+
+		byte[] toRead = new byte[count];
+		
+		int readCount = file.read(toRead, 0, count);
+		
+		if(readCount == -1) {
+			return -1;
+		}
+		writeVirtualMemory(address, toRead);
+
+		return readCount;
+    }
+
+    private void exit(int status) {
+        //Closes open files that belong to the process
+        for(int i = 0; i < MAX_PROCESSES; i++) {
+            if(fdTable[i] != null) {
+                close(i);
+            }
+        }
+        
+        //Any children of the processes don't have any parents process -> null
+        for(int i : children.keySet())
+            children.get(i).parent = null; // Cuts off head
+        children.clear();
+        
+        //Changes process status to the user entered one for normal exiting or -1 for errors
+        this.status = status;
+        
+        //Unload sections and release the memory pages
+        this.unloadSections();
+        
+        if(pid == 0){
+            //Only allows the root to terminate the machine
+            Kernel.kernel.terminate();
+        }
+    }
 
     private int join(int pid, int statusAddr){
         if(statusAddr < 0) return 0;
@@ -439,7 +546,53 @@ public class UserProcess {
         else
             return 0; // Exited with an unhandled exception
     }
+    
+    private int write(int fd, int address, int count) {
+		if(fd >= MAX_PROCESSES || fd < 0) {
+			return -1;
+		}
 
+		OpenFile file = fdTable[fd];
+		if(file == null) {
+			return -1;
+		}
+
+		byte[] buffer = new byte[count];
+		int bufferWriteCount = readVirtualMemory(address, buffer);
+		
+		if(bufferWriteCount == -1 || bufferWriteCount != count) {
+			return -1;
+		}
+
+		int writeCount = file.write(buffer, 0, count);
+
+		if(writeCount != count) {
+			return -1;
+		} 
+		
+		return writeCount;
+    }
+
+    private int close(int fd) {
+    	//check if fd is in bounds
+    	if (fd < MAX_PROCESSES && fd >= 0 && fdTable[fd] != null) {
+    		fdTable[fd].close();
+    		fdTable[fd] = null;
+    		return 0;
+    	} else {
+    		return -1;
+    	}
+    
+    private int unlink(String name) {
+    	boolean flag;
+    	flag = ThreadedKernel.fileSystem.remove(name);
+    	if (flag) {
+    		return 0;
+    	} else {
+    		return -1;
+    	}
+    }
+    
     private static final int
         syscallHalt = 0,
         syscallExit = 1,
@@ -481,6 +634,7 @@ public class UserProcess {
      * @return	the value to be returned to the user.
      */
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
+    	String name;
         switch (syscall) {
             case syscallHalt:
                 return handleHalt();
@@ -488,8 +642,41 @@ public class UserProcess {
                 return exec(a0, a1, a2);
             case syscallJoin:
                 return join(a0, a1);
-
-
+            case syscallExit:
+                exit(a0);
+                return 0;			//will most likely be replaced by a return
+            case syscallCreate:
+                name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+                //check for invalid file name
+                if (name == null) {
+                    return -1;
+                } else {
+                    return creat(name);
+                }
+                
+            case syscallOpen:
+                name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+                //check for invalid file name
+                if (name == null) {
+                    return -1;
+                } else {
+                    return open(name);
+                }
+            case syscallRead:
+                return read(a0, a1, a2);	//unsure where to get buffer from
+            case syscallWrite:
+                return write(a0, a1, a2);	//unsure where to get buffer from
+            case syscallClose:
+                return close(a0);
+            case syscallUnlink:
+                name = readVirtualMemoryString(a0, MAX_NAME_LENGTH);
+                //check for invalid file name
+                //*****not checking if name is null might cause errors but think this makes sense logically
+        //		if (name == null) {
+        //			return -1;
+        //		} else {
+                    return unlink(name);
+        //		}
             default:
                 Lib.debug(dbgProcess, "Unknown syscall " + syscall);
                 Lib.assertNotReached("Unknown system call!");
