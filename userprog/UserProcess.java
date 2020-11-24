@@ -133,7 +133,7 @@ public class UserProcess {
      */
     public int readVirtualMemory(int vaddr, byte[] data) {
         return readVirtualMemory(vaddr, data, 0, data.length);
-    }
+    var
 
     /**
      * Transfer data from this process's virtual memory to the specified array.
