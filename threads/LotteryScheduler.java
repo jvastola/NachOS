@@ -2,11 +2,9 @@ package nachos.threads;
 
 import nachos.machine.*;
 
-import java.util.TreeSet;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Random;
-import java.util.Comparator;
+import java.util.Iterator;
+import java.util.HashSet;
 
 /**
  * A scheduler that chooses threads using a lottery.
@@ -31,62 +29,145 @@ import java.util.Comparator;
 public class LotteryScheduler extends PriorityScheduler {
     public LotteryScheduler() {
     }
-    public static final int priorityDefault = 1;
-    public static final int priorityMinimum = 1;
-    public static final int priorityMaximum = Integer.MAX_VALUE;    
+    public static int priorityMinimum = 1;
+    public static int priorityDefault = 1;
+    public static int priorityMaximum = Integer.MAX_VALUE;
 
-    public ThreadQueue newThreadQueue(boolean transferPriority) {
-        return new LotteryQueue();
-        }
-    protected class LotteryQueue extends PriorityQueue {
-        LotteryQueue(boolean transferPriority){
-            super(transferPriority)  ;
-        }
-        protected ThreadState pickNextThread() {
-            ThreadState ret = null;
-            int totalTickets = getTotalTickets();
-            if(totalTickets>0){
-                int choose = (new Random()).nextInt(totalTickets) + 1;
-                for(ThreadState thread: waiting){
-                    choose+= getThreadState(thread.getThread()).getEffectivePriority();
-                    if(choose<=sum){
-                        return ret;
-                    }
-                }
-            }
-        }
-        public int getTotalTickets() {
-            int totalTickets = 0; 
-            for (ThreadState t : waiting) totalTickets += getThreadState(t.getThread()).getEffectivePriority();
-            return totalTickets;
-        }   
-        TreeSet<ThreadState> waiting;
+        @Override
+	protected ThreadState getThreadState(KThread thread) {
+		if (thread.schedulingState == null)
+			thread.schedulingState = new ThreadState(thread);
+
+		return (ThreadState) thread.schedulingState;
+	}
+
+    public ThreadQueue newThreadQueue(boolean transferPriority){
+    	return new LotteryQueue(transferPriority);
     }
-    protected class LotteryThreadState extends ThreadState{
-        public LotteryThreadState(KThread thread) {
-			super(thread);
-        }
-        public int getEffectivePriority() {
-			return getEffectivePriority(new HashSet<LotteryThreadState>());
+    
+    protected class LotteryQueue extends PriorityScheduler.PriorityQueue{
+    	LotteryQueue(boolean transferPriority){
+    		super(transferPriority)  ;
+    		waitQueue = new HashSet<ThreadState>();
+    	}
+		@Override
+		public void waitForAccess(KThread thread) {
+			Lib.assertTrue(Machine.interrupt().disabled());
+			getThreadState(thread).waitForAccess(this);
 		}
-        public int getEffectivePriority(HashSet<LotteryThreadState> threadSet) {
-            if (threadSet.contains(this)) {
-				return priority;
-			}
-			ePriority = priority;
-
-			for (PriorityQueue pq : donateQueue)
-				if (pq.transferPriority)
-					for (KThread thread : pq.waitQueue) {
-						threadSet.add(this);
-						ePriority += getThreadState(thread)
-								.getEffectivePriority(threadSet);
-						threadSet.remove(this);
-					}
-
-			return ePriority;
+		@Override
+		public void acquire(KThread thread) {
+			Lib.assertTrue(Machine.interrupt().disabled());
+			getThreadState(thread).acquire(this);
         }
+		@Override
+		public KThread nextThread() {
+			Lib.assertTrue(Machine.interrupt().disabled());
+				ThreadState nextThread = this.pickNextThread();
+				if (nextThread == null)
+					return null;
+				nextThread.acquire(this);
+				return nextThread.thread;
+		}
+		@Override
+		protected ThreadState pickNextThread() {
+			if (totalTickets == 0) return null; //nothing to do
+            int choose =  (new Random()).nextInt(totalTickets); //random ticket
+			for (ThreadState T : waitQueue){ 
+				if (choose >= T.base && choose < T.base + T.getEffectivePriority()){ 
+					return T;//choose next thread
+				}
+			}
+			return null;
+		}
+		
+    	public void updateTotalTickets(){
+    		totalTickets = 0; // number of tickets starts at 0
+    		for (ThreadState T : waitQueue){ // all waiting threads donate then submit tickets
+    			if (owner != null && this.transferPriority){
+					T.revert();
+					if (T.ePriority > 0){
+						T.donated = T.ePriority; // save amount donated
+						owner.ePriority += T.donated; // donate 
+						T.borrower = owner; // save a reference to thread donated to
+					}
+				}
+    			T.base = totalTickets; 
+    			totalTickets += T.ePriority;
+    		}
+    	}
+        ThreadState owner;
+    	HashSet<ThreadState> waitQueue;
+    	int totalTickets = 0; // number of tickets in this queue
+    	
     }
+    protected class ThreadState extends PriorityScheduler.ThreadState{
+
+		public ThreadState(KThread thread) {
+			super(thread)  ;
+		}
+	    @Override
+		public int getEffectivePriority() {
+
+			for (LotteryQueue Q : owned){ 
+				for (ThreadState T : Q.waitQueue){
+					T.getEffectivePriority();
+				}
+				Q.updateTotalTickets(); 
+			}
+			revert(); // reclaim donation
+			if (waiting != null) {
+				waiting.updateTotalTickets();//try donating
+			} 
+        	return (ePriority > 0)? ePriority:1;
+		}
+	    @Override
+		public void setPriority(int priority) {
+			if (priority > 0 && priority != this.priority){
+				this.priority = this.ePriority = priority;
+				updatePriority(); 
+			}
+		}
+		public void waitForAccess(LotteryQueue waitQueue) {
+			if (owned.remove(waitQueue)){ 
+				waitQueue.owner = null;//previously owned
+			}
+			waiting = waitQueue; 
+			waiting.waitQueue.add(this); 
+			updatePriority(); 
+		}
+		public void acquire(LotteryQueue ownedQueue) {
+			if (waiting == ownedQueue){ 
+				waiting.waitQueue.remove(this);//stop waiting
+				waiting = null;
+			}
+			if (ownedQueue.owner != null && ownedQueue.owner != this){
+				ownedQueue.owner.owned.remove(ownedQueue); 
+				ownedQueue.owner.updatePriority(); 
+			}
+			ownedQueue.owner = this; 
+			updatePriority();
+		}
+		public void updatePriority(){
+			for (LotteryQueue lq : owned){ 
+				lq.updateTotalTickets();//all owned donations
+			}
+			if (waiting != null) waiting.updateTotalTickets();
+		}
+		public void revert(){
+			if (borrower != null){ 
+				borrower.revert(); 
+				borrower.ePriority -= donated; 
+				donated = 0;
+				borrower = null; 
+			}
+		}
+		public int donated = 0;
+    	public int base = 0;
+    	public ThreadState borrower = null;
+    	public HashSet<LotteryQueue> owned =new HashSet<LotteryQueue>();
+    	public LotteryQueue waiting = null; 
+    	
+	}
+    
 }
-    
-    
