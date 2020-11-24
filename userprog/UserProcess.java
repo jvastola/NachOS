@@ -359,6 +359,51 @@ public class UserProcess {
         }
     }
 
+    private int exec(int file, int argc, int argv){
+        //return -1 if any of these are true
+
+        if(argc < 0)
+            return -1;
+        
+        String nameOfFile = readVirtualMemoryString(file, 256);
+        if(nameOfFile == null)
+            return -1;
+
+        String suffix = nameOfFile.substring(nameOfFile.length() - 4, nameOfFile.length());
+        if(suffix.equals(".coff"))
+            return -1;
+        
+        //getting args from argv address
+        String args[] = new String[argc];
+        byte temp[] = new byte[4];
+
+        for(int i = 0; i < argc; i++){
+            
+            int count = readVirtualMemory(argv + i*4, temp);
+
+            if(count != 4)
+                return -1;
+
+            int addr = Lib.bytesToInt(temp, 0);
+            args[i] = readVirtualMemoryString(addr, 256);
+        }
+        
+        //new child process
+        UserProcess child = UserProcess.newUserProcess();
+        child.parent = this;
+        this.children.put(child.pid, child);
+        
+        
+        //load executable and create new user thread
+        boolean checkValue = child.execute(nameOfFile, args);
+        
+        if(checkValue) 
+            return child.pid;
+        else
+            return -1;
+        
+    }
+
     private int join(int pid, int statusAddr){
         if(statusAddr < 0) return 0;
 
@@ -439,6 +484,8 @@ public class UserProcess {
         switch (syscall) {
             case syscallHalt:
                 return handleHalt();
+            case syscallExec:
+                return exec(a0, a1, a2);
             case syscallJoin:
                 return join(a0, a1);
 
