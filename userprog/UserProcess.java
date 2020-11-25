@@ -156,7 +156,7 @@ public class UserProcess {
         TranslationEntry te= pageTable[vpn];
         te.used = true;
         int vOffset = vaddr % pageSize;
-        int paddr = entry.ppn * pageSize + vOffset;
+        int paddr = te.ppn * pageSize + vOffset;
         // for now, just assume that virtual addresses equal physical addresses
         // will return true if our translation entry read only isn't valid
 	    if (paddr < 0 || paddr >= memory.length || !te.valid)
@@ -205,13 +205,13 @@ public class UserProcess {
         TranslationEntry te = pageTable[vpn];
         te.used = true;
         int vOffset = vaddr % pageSize;
-        int paddr = entry.ppn * pageSize + vOffset;
+        int paddr = te.ppn * pageSize + vOffset;
         // for now, just assume that virtual addresses equal physical addresses
         // we have to make sure nothing is copied if the table entry is not valid and in read only
 	    if (paddr < 0 || paddr >= memory.length || !te.valid || te.readOnly){
 	        return 0;
         }
-        entry.dirty = true;
+        te.dirty = true;
 
         int amount = Math.min(length, memory.length-vaddr);
         System.arraycopy(data, offset, memory, vaddr, amount);
@@ -399,7 +399,7 @@ public class UserProcess {
         if(argc < 0)
             return -1;
         
-        String nameOfFile = readVirtualMemoryString(file, 256);
+        String nameOfFile = readVirtualMemoryString(file, MAX_NAME_LENGTH);
         if(nameOfFile == null)
             return -1;
 
@@ -419,7 +419,7 @@ public class UserProcess {
                 return -1;
 
             int addr = Lib.bytesToInt(temp, 0);
-            args[i] = readVirtualMemoryString(addr, 256);
+            args[i] = readVirtualMemoryString(addr, MAX_NAME_LENGTH);
         }
         
         //new child process
