@@ -7,7 +7,6 @@ import nachos.userprog.*;
 import java.io.EOFException;
 
 // Added imports
-// import java.util.LinkedList;
 import java.util.HashMap;
 
 /**
@@ -40,7 +39,6 @@ public class UserProcess {
             pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
         // Added variable declarations
         pid = pidTracker++; // Maybe problem?
-        // children = new LinkedList<Integer>();
         children = new HashMap<Integer, UserProcess>();
         parent = null;
         fdTable = new OpenFile[MAX_PROCESSES];	//might need to be changed
@@ -133,7 +131,7 @@ public class UserProcess {
      */
     public int readVirtualMemory(int vaddr, byte[] data) {
         return readVirtualMemory(vaddr, data, 0, data.length);
-    var
+    }
 
     /**
      * Transfer data from this process's virtual memory to the specified array.
@@ -156,17 +154,17 @@ public class UserProcess {
 
         int vpn = vaddr/pageSize;
         TranslationEntry te= pageTable[vpn];
-        te.read = true; 
+        te.used = true;
+        int vOffset = vaddr % pageSize;
+        int paddr = entry.ppn * pageSize + vOffset;
         // for now, just assume that virtual addresses equal physical addresses
         // will return true if our translation entry read only isn't valid
-	    if (vaddr < 0 || vaddr >= memory.length || !te.valid)
-	    return 0;
+	    if (paddr < 0 || paddr >= memory.length || !te.valid)
+	        return 0;
         // for now, just assume that virtual addresses equal physical addresses
-        //if (vaddr < 0 || vaddr >= memory.length)
-        //    return 0;
 
         int amount = Math.min(length, memory.length-vaddr);
-        System.arraycopy(memory, vaddr, data, offset, amount);
+        System.arraycopy(memory, paddr, data, offset, amount);
 
         return amount;
     }
@@ -204,15 +202,16 @@ public class UserProcess {
         byte[] memory = Machine.processor().getMemory();
         
         int vpn = vaddr/pageSize;
-        TranslationEntry te= pageTable[vpn];
-        te.read = true;
+        TranslationEntry te = pageTable[vpn];
+        te.used = true;
+        int vOffset = vaddr % pageSize;
+        int paddr = entry.ppn * pageSize + vOffset;
         // for now, just assume that virtual addresses equal physical addresses
         // we have to make sure nothing is copied if the table entry is not valid and in read only
-	    if (vaddr < 0 || vaddr >= memory.length || !te.valid || te.readOnly)
-	    return 0;
-        // for now, just assume that virtual addresses equal physical addresses
-        //if (vaddr < 0 || vaddr >= memory.length)
-        //    return 0;
+	    if (paddr < 0 || paddr >= memory.length || !te.valid || te.readOnly){
+	        return 0;
+        }
+        entry.dirty = true;
 
         int amount = Math.min(length, memory.length-vaddr);
         System.arraycopy(data, offset, memory, vaddr, amount);
@@ -330,10 +329,8 @@ public class UserProcess {
 
             for (int i=0; i<section.getLength(); i++) {
                 int vpn = section.getFirstVPN()+i;
-                //int vpn = vaddr/pageSize;
                 TranslationEntry te= pageTable[vpn];
-                te.read = true;
-                te.readOnly = secyion.isReadOnly();
+                te.readOnly = section.isReadOnly();
                 // for now, just assume virtual addresses=physical addresses
                 section.loadPage(i, vpn);
             }
@@ -531,20 +528,6 @@ public class UserProcess {
     private int join(int pid, int statusAddr){
         if(statusAddr < 0) return 0;
 
-        /*
-        // Checks if pid process is child
-        UserProcess pidProc = null;
-        boolean isChild = false;
-        for(int i = 0; i < children.size(); i++){
-            if(children.get(i).contains(pid)){
-                pidProc = children.get(i);
-                isChild = true;
-                break;
-            }
-        }
-        if(!isChild) return -1;
-        */
-
         // Checks if pid process is child
         UserProcess pidProc = children.get(pid);
         if(pidProc == null) return -1; // pid is not a child of current process
@@ -599,6 +582,7 @@ public class UserProcess {
     	} else {
     		return -1;
     	}
+    }
     
     private int unlink(String name) {
     	boolean flag;
@@ -751,7 +735,6 @@ public class UserProcess {
     // Added class variables
     private int pid;
     private int status;
-    // private LinkedList<Integer> children;
     private HashMap<Integer, UserProcess> children;
     private UserProcess parent;
     private static int pidTracker = 0;
