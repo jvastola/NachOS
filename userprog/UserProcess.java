@@ -153,7 +153,7 @@ public class UserProcess {
 	    Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
 
         byte[] memory = Machine.processor().getMemory();
-        
+
         int vpn = vaddr/pageSize;
         TranslationEntry te= pageTable[vpn];
         te.read = true; 
@@ -162,8 +162,8 @@ public class UserProcess {
 	    if (vaddr < 0 || vaddr >= memory.length || !te.valid)
 	    return 0;
         // for now, just assume that virtual addresses equal physical addresses
-        if (vaddr < 0 || vaddr >= memory.length)
-            return 0;
+        //if (vaddr < 0 || vaddr >= memory.length)
+        //    return 0;
 
         int amount = Math.min(length, memory.length-vaddr);
         System.arraycopy(memory, vaddr, data, offset, amount);
@@ -211,8 +211,8 @@ public class UserProcess {
 	    if (vaddr < 0 || vaddr >= memory.length || !te.valid || te.readOnly)
 	    return 0;
         // for now, just assume that virtual addresses equal physical addresses
-        if (vaddr < 0 || vaddr >= memory.length)
-            return 0;
+        //if (vaddr < 0 || vaddr >= memory.length)
+        //    return 0;
 
         int amount = Math.min(length, memory.length-vaddr);
         System.arraycopy(data, offset, memory, vaddr, amount);
