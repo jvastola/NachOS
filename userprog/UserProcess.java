@@ -152,8 +152,15 @@ public class UserProcess {
     public int readVirtualMemory(int vaddr, byte[] data, int offset, int length){
 	    Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
 
-	    byte[] memory = Machine.processor().getMemory();
+        byte[] memory = Machine.processor().getMemory();
         
+        int vpn = vaddr/pageSize;
+        TranslationEntry te= pageTable[vpn];
+        te.read = true; 
+        // for now, just assume that virtual addresses equal physical addresses
+        // will return true if our translation entry read only isn't valid
+	    if (vaddr < 0 || vaddr >= memory.length || !te.valid)
+	    return 0;
         // for now, just assume that virtual addresses equal physical addresses
         if (vaddr < 0 || vaddr >= memory.length)
             return 0;
@@ -196,6 +203,13 @@ public class UserProcess {
 
         byte[] memory = Machine.processor().getMemory();
         
+        int vpn = vaddr/pageSize;
+        TranslationEntry te= pageTable[vpn];
+        te.read = true;
+        // for now, just assume that virtual addresses equal physical addresses
+        // we have to make sure nothing is copied if the table entry is not valid and in read only
+	    if (vaddr < 0 || vaddr >= memory.length || !te.valid || te.readOnly)
+	    return 0;
         // for now, just assume that virtual addresses equal physical addresses
         if (vaddr < 0 || vaddr >= memory.length)
             return 0;
@@ -316,7 +330,10 @@ public class UserProcess {
 
             for (int i=0; i<section.getLength(); i++) {
                 int vpn = section.getFirstVPN()+i;
-
+                //int vpn = vaddr/pageSize;
+                TranslationEntry te= pageTable[vpn];
+                te.read = true;
+                te.readOnly = secyion.isReadOnly();
                 // for now, just assume virtual addresses=physical addresses
                 section.loadPage(i, vpn);
             }
